@@ -17,24 +17,31 @@ jobs:
       - uses: crazy-max/ghaction-docker-meta@v1
         id: docker_meta
         with:
-          images: |
-            jakewharton/gitout
-            ghcr.io/jakewharton/gitout
+          images: ghcr.io/leandrofavarin/gitout
           tag-semver: |
             {{version}}
             {{major}}
             {{major}}.{{minor}}
 
-      - uses: docker/login-action@v2.1.0
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
         with:
-          username: jakewharton
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          buildkitd-flags: --debug
+
+      # - uses: docker/login-action@v2.1.0
+      #   with:
+      #     username: jakewharton
+      #     password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - run: echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
 
       - uses: docker/build-push-action@v4.0.0
         with:
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
 

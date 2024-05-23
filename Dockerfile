@@ -1,10 +1,10 @@
 # Cross-compile the app for musl to create a statically-linked binary for alpine.
-FROM rust:1.65.0 AS rust
+FROM rust:1.68.2 AS rust
 RUN rustup component add clippy rustfmt
 WORKDIR /app
 COPY Cargo.toml Cargo.lock .rustfmt.toml ./
 COPY src ./src
-RUN cargo build --release
+RUN cargo build --release --config net.git-fetch-with-cli=true
 RUN cargo clippy
 RUN cargo test
 RUN cargo fmt -- --check
