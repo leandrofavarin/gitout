@@ -1,10 +1,32 @@
-# Cross-compile the app for musl to create a statically-linked binary for alpine.
-FROM rust:1.68.2 AS rust
+# Tools to support cross-compilation which simplifies specific arch conditions.
+FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
+
+
+FROM --platform=$BUILDPLATFORM rust:1.68.2 AS rust
+COPY --from=xx / /
+ARG TARGETPLATFORM
+RUN case "$TARGETPLATFORM" in \
+  "linux/amd64") echo x86_64-unknown-linux-gnu > /rust_target.txt ;; \
+  "linux/arm64") echo aarch64-unknown-linux-gnu > /rust_target.txt ;; \
+  *) exit 1 ;; \
+esac
+RUN case "$TARGETPLATFORM" in \
+  "linux/amd64") echo gcc-x86-64-linux-gnu > /gcc.txt ;; \
+  "linux/arm64") echo gcc-aarch64-linux-gnu > /gcc.txt ;; \
+  *) exit 1 ;; \
+esac
+RUN rustup target add $(cat /rust_target.txt)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libssl-dev $(cat /gcc.txt)
 RUN rustup component add clippy rustfmt
 WORKDIR /app
 COPY Cargo.toml Cargo.lock .rustfmt.toml ./
 COPY src ./src
-RUN cargo build --release --config net.git-fetch-with-cli=true
+RUN cargo build -v --release --target $(cat /rust_target.txt) --config net.git-fetch-with-cli=true
+# Move the binary to a location free of the target since that is not available in the next stage.
+RUN cp target/$(cat /rust_target.txt)/release/gitout .
+RUN xx-verify ./gitout
 RUN cargo clippy
 RUN cargo test
 RUN cargo fmt -- --check
@@ -21,9 +43,26 @@ RUN find . -type f | xargs shellcheck -e SC1008
 RUN shfmt -d .
 
 
-FROM debian:buster-slim
-ADD https://github.com/just-containers/s6-overlay/releases/download/v2.2.0.1/s6-overlay-amd64-installer /tmp/
-RUN chmod +x /tmp/s6-overlay-amd64-installer && /tmp/s6-overlay-amd64-installer /
+FROM --platform=$BUILDPLATFORM debian:buster-slim
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      wget
+ARG TARGETPLATFORM
+# ADD isn't a shell command thus doesn't allow resolving a variable
+# https://github.com/just-containers/s6-overlay/issues/512
+RUN \
+    # Extract the architecture part (e.g., amd64, arm64)
+    ARCH=$(echo "$TARGETPLATFORM" | cut -d '/' -f2) && \
+    if [ "$ARCH" = "amd64" ]; then \
+      echo https://github.com/just-containers/s6-overlay/releases/download/v2.2.0.1/s6-overlay-amd64-installer > /s6-url.txt ; \
+    elif [ "$ARCH" = "arm64" ]; then \
+      echo https://github.com/just-containers/s6-overlay/releases/download/v2.2.0.1/s6-overlay-aarch64-installer > /s6-url.txt ; \
+    else \
+      echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi
+RUN wget --no-check-certificate $(cat /s6-url.txt) -O /tmp/installer
+RUN chmod +x /tmp/installer && /tmp/installer /
+
 ENV \
     # Fail if cont-init scripts exit with non-zero code.
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
@@ -42,4 +81,4 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY root/ /
 WORKDIR /app
-COPY --from=rust /app/target/release/gitout ./
+COPY --from=rust /app/gitout ./
