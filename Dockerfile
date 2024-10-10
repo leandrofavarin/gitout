@@ -1,8 +1,8 @@
-# Tools to support cross-compilation which simplifies specific arch conditions.
+# Tools to support cross-compilation
 FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
 
 
-FROM --platform=$BUILDPLATFORM rust:1.68.2 AS rust
+FROM --platform=$BUILDPLATFORM rust:1.81.0 AS rust
 COPY --from=xx / /
 ARG TARGETPLATFORM
 RUN case "$TARGETPLATFORM" in \
@@ -18,7 +18,8 @@ esac
 RUN rustup target add $(cat /rust_target.txt)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    libssl-dev $(cat /gcc.txt)
+    $(cat /gcc.txt)
+    # libssl-dev 
 RUN rustup component add clippy rustfmt
 WORKDIR /app
 COPY Cargo.toml Cargo.lock .rustfmt.toml ./
