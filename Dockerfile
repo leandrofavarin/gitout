@@ -10,6 +10,8 @@ RUN case "$TARGETPLATFORM" in \
   "linux/arm64") echo aarch64-unknown-linux-gnu > /rust_target.txt ;; \
   *) exit 1 ;; \
 esac
+# Installs the gcc which contains the correct linker to be used
+# config.toml will bind the arch to the linker that's being installed here.
 RUN case "$TARGETPLATFORM" in \
   "linux/amd64") echo gcc-x86-64-linux-gnu > /gcc.txt ;; \
   "linux/arm64") echo gcc-aarch64-linux-gnu > /gcc.txt ;; \
@@ -22,7 +24,7 @@ RUN apt-get update && \
     # libssl-dev 
 RUN rustup component add clippy rustfmt
 WORKDIR /app
-COPY Cargo.toml Cargo.lock .rustfmt.toml ./
+COPY Cargo.toml Cargo.lock .rustfmt.toml .cargo/config.toml ./
 COPY src ./src
 RUN cargo build -v --release --target $(cat /rust_target.txt) --config net.git-fetch-with-cli=true
 # Move the binary to a location free of the target since that is not available in the next stage.
