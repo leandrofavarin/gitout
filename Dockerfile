@@ -26,7 +26,7 @@ RUN rustup component add clippy rustfmt
 WORKDIR /app
 COPY Cargo.toml Cargo.lock .rustfmt.toml .cargo/config.toml ./
 COPY src ./src
-RUN cargo build -v --release --target $(cat /rust_target.txt) --config net.git-fetch-with-cli=true
+RUN cargo build -v --release --target $(cat /rust_target.txt)
 # Move the binary to a location free of the target since that is not available in the next stage.
 RUN cp target/$(cat /rust_target.txt)/release/gitout .
 RUN xx-verify ./gitout
