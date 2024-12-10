@@ -20,7 +20,8 @@ esac
 RUN rustup target add $(cat /rust_target.txt)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    $(cat /gcc.txt) libssl-dev
+    $(cat /gcc.txt) \
+    libssl-dev build-essential zlib1g-dev
 RUN rustup component add clippy rustfmt
 WORKDIR /app
 COPY Cargo.toml Cargo.lock .rustfmt.toml .cargo/config.toml ./
